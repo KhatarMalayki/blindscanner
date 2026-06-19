@@ -12,6 +12,7 @@ installer-dist/
 *.spec.bak
 
 # Cloudflare / Wrangler
+.wrangler/
 cloudflare/.dev.vars
 cloudflare/.wrangler/
 cloudflare/node_modules/
