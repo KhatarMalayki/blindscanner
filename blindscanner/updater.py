@@ -106,18 +106,24 @@ def fetch_licensed_update_manifest(
     return _parse_manifest_payload(payload)
 
 
-def download_update(download_url: str, version: str) -> Path:
+def download_update(download_url: str, version: str, progress_callback=None) -> Path:
     target_dir = Path(tempfile.gettempdir()) / "runlab-scanner-updates"
     target_dir.mkdir(parents=True, exist_ok=True)
     target_path = target_dir / f"RunLabScanner-{version}.exe"
     try:
         request = Request(download_url, headers={"User-Agent": _USER_AGENT})
         with urlopen(request, timeout=120) as response, open(target_path, "wb") as out_file:
+            total = int(response.headers.get("Content-Length", "0") or "0")
+            downloaded = 0
             while True:
                 chunk = response.read(65536)
                 if not chunk:
                     break
                 out_file.write(chunk)
+                downloaded += len(chunk)
+                if progress_callback is not None:
+                    percent = int(downloaded * 100 / total) if total else None
+                    progress_callback(downloaded, total, percent)
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
         raise UpdateError(f"Gagal mengunduh update: {exc}") from exc
     return target_path

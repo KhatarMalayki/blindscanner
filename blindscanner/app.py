@@ -551,8 +551,23 @@ class BlindScannerApp:
         thread.start()
 
     def _download_and_install_update_worker(self, manifest: UpdateManifest) -> None:
+        last_percent = [-1]
+
+        def on_progress(downloaded: int, total: int, percent) -> None:
+            mb_done = downloaded / 1048576
+            if percent is None:
+                msg = f"Mengunduh update {manifest.version}... {mb_done:.1f} MB"
+            else:
+                # Update status hanya tiap kelipatan 1% agar UI tidak terlalu sering refresh.
+                if percent == last_percent[0]:
+                    return
+                last_percent[0] = percent
+                mb_total = total / 1048576
+                msg = f"Mengunduh update {manifest.version}... {percent}% ({mb_done:.1f}/{mb_total:.1f} MB)"
+            self.root.after(0, lambda: self.status_var.set(msg))
+
         try:
-            downloaded_exe = download_update(manifest.url, manifest.version)
+            downloaded_exe = download_update(manifest.url, manifest.version, progress_callback=on_progress)
             self.root.after(0, lambda: self._apply_downloaded_update(manifest, downloaded_exe))
         except UpdateError as exc:
             self.root.after(0, lambda: self._handle_update_error(str(exc)))
