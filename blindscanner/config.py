@@ -15,6 +15,9 @@ import os
 DEFAULT_LICENSE_API_URL = "https://runlab-licenses.khatarmalayki21.workers.dev"
 DEFAULT_LICENSE_SIGNING_KEY = "wo7PYgi1H9FfTBVcUQXakNsKehGvSZWMExDjpRyJAblLC568"
 
+# Base URL publik R2 (custom domain) untuk unduhan file update.
+DEFAULT_UPDATE_BASE_URL = "https://update-runlabscanner.runlab.my.id"
+
 
 def get_license_api_url() -> str:
     return (os.environ.get("RUNLAB_LICENSE_API_URL") or DEFAULT_LICENSE_API_URL).rstrip("/")

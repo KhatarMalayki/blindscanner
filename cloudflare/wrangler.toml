@@ -16,8 +16,8 @@ binding = "RELEASES"
 bucket_name = "runlab-scanner-releases"
 
 [vars]
-# Base URL publik R2 (untuk membentuk URL unduhan update).
-PUBLIC_BASE_URL = "https://pub-4c6cd53894844347a052a904dd7c5027.r2.dev"
+# Base URL publik R2 via custom domain (untuk membentuk URL unduhan update).
+PUBLIC_BASE_URL = "https://update-runlabscanner.runlab.my.id"
 
 # Secret (JANGAN ditulis di sini). Set dengan:
 #   wrangler secret put ADMIN_TOKEN       -> token login dashboard admin
