@@ -51,8 +51,8 @@ $releaseFileName = "RunLabScanner-$appVersion.exe"
 $releaseObjectKey = "$ReleasePrefix/$releaseFileName"
 $releaseUrl = "$normalizedBaseUrl/$releaseObjectKey"
 
-Write-Host "Uploading EXE ke R2: $releaseObjectKey" -ForegroundColor Cyan
-& wrangler r2 object put "$Bucket/$releaseObjectKey" --file "$resolvedExePath"
+Write-Host "Uploading EXE ke R2 (remote): $releaseObjectKey" -ForegroundColor Cyan
+& wrangler r2 object put "$Bucket/$releaseObjectKey" --file "$resolvedExePath" --remote
 
 # Daftarkan release ke Worker (D1) agar dipakai endpoint update ber-license.
 $payload = [ordered]@{
