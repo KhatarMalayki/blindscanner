@@ -1,0 +1,24 @@
+name = "runlab-licenses"
+main = "src/worker.js"
+compatibility_date = "2024-11-01"
+
+# D1 database untuk license & activation.
+# Buat dengan: wrangler d1 create runlab-licenses
+# lalu salin database_id hasilnya ke bawah ini.
+[[d1_databases]]
+binding = "DB"
+database_name = "runlab-licenses"
+database_id = "08d097ee-5e2f-441e-9aea-e4cdf45690d6"
+
+# R2 bucket berisi file update EXE (bucket yang sama dengan release_to_r2.ps1).
+[[r2_buckets]]
+binding = "RELEASES"
+bucket_name = "runlab-scanner-releases"
+
+[vars]
+# Base URL publik R2 (untuk membentuk URL unduhan update).
+PUBLIC_BASE_URL = "https://pub-4c6cd53894844347a052a904dd7c5027.r2.dev"
+
+# Secret (JANGAN ditulis di sini). Set dengan:
+#   wrangler secret put ADMIN_TOKEN       -> token login dashboard admin
+#   wrangler secret put LICENSE_SIGNING_KEY -> kunci HMAC tanda-tangan respons license

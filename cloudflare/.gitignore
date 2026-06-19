@@ -1,0 +1,7 @@
+# Wrangler / Cloudflare lokal
+.dev.vars
+.wrangler/
+node_modules/
+
+# Screenshot demo Playwright
+.playwright-mcp/

@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Build artifacts
+build/
+dist/
+installer-dist/
+*.spec.bak
+
+# Cloudflare / Wrangler
+cloudflare/.dev.vars
+cloudflare/.wrangler/
+cloudflare/node_modules/
+
+# Playwright
+.playwright-mcp/
+
+# Editor / history
+.history/
+.vscode/
+
+# OS
+Thumbs.db
+desktop.ini
