@@ -37,10 +37,19 @@ FORMAT_MAP = {
 
 
 def _run_powershell(script: str) -> str:
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    startupinfo = None
+    if hasattr(subprocess, "STARTUPINFO"):
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = 0  # SW_HIDE
+
     result = subprocess.run(
         [
             "powershell",
             "-NoProfile",
+            "-WindowStyle",
+            "Hidden",
             "-ExecutionPolicy",
             "Bypass",
             "-Command",
@@ -49,6 +58,8 @@ def _run_powershell(script: str) -> str:
         capture_output=True,
         text=True,
         encoding="utf-8",
+        creationflags=creationflags,
+        startupinfo=startupinfo,
     )
     if result.returncode != 0:
         message = result.stderr.strip() or result.stdout.strip() or "Unknown PowerShell error"
@@ -104,15 +115,22 @@ $items | ConvertTo-Json -Depth 3
 
         output_path = output_path.resolve()
         output_path.parent.mkdir(parents=True, exist_ok=True)
+        # WIA SaveFile gagal bila file tujuan sudah ada. Hapus dulu jika ada.
+        try:
+            output_path.unlink(missing_ok=True)
+        except OSError:
+            pass
         escaped_device_id = device_id.replace("'", "''")
         escaped_output = str(output_path).replace("'", "''")
         escaped_format = fmt.replace("'", "''")
         dpi = max(75, min(int(options.dpi), 600))
         brightness = max(-1000, min(int(options.brightness), 1000))
         contrast = max(-1000, min(int(options.contrast), 1000))
-        color_mode_map = {"color": 1, "grayscale": 2, "bw": 4, "blackwhite": 4}
-        color_mode = color_mode_map.get(options.color_mode.lower())
-        if color_mode is None:
+        # WIA intent (current intent / 6146): bitmask.
+        #   1 = color, 2 = grayscale, 4 = text/bw
+        intent_map = {"color": 1, "grayscale": 2, "bw": 4, "blackwhite": 4}
+        intent = intent_map.get(options.color_mode.lower())
+        if intent is None:
             raise WIAError(f"Unsupported color mode: {options.color_mode}")
 
         script = rf"""
@@ -123,7 +141,7 @@ $formatId = '{escaped_format}'
 $dpi = {dpi}
 $brightness = {brightness}
 $contrast = {contrast}
-$colorMode = {color_mode}
+$intent = {intent}
 $manager = New-Object -ComObject WIA.DeviceManager
 $deviceInfo = $null
 foreach ($info in $manager.DeviceInfos) {{
@@ -140,20 +158,62 @@ if ($device.Items.Count -lt 1) {{
     throw "Scanner device has no items to scan"
 }}
 $item = $device.Items.Item(1)
-try {{ $item.Properties['6147'].Value = $colorMode }} catch {{}}
-try {{ $item.Properties['6148'].Value = $dpi }} catch {{}}
-try {{ $item.Properties['6149'].Value = $dpi }} catch {{}}
-try {{ $item.Properties['6151'].Value = $brightness }} catch {{}}
-try {{ $item.Properties['6152'].Value = $contrast }} catch {{}}
+
+function Set-WiaProperty($props, $id, $value) {{
+    foreach ($p in $props) {{
+        if ($p.PropertyID -eq $id) {{
+            try {{ $p.Value = $value }} catch {{}}
+            return
+        }}
+    }}
+}}
+
+# 6146 = Current Intent (color/grayscale/text)
+Set-WiaProperty $item.Properties 6146 $intent
+# 6147/6148 = X/Y Resolution (DPI) - HARUS sama agar tidak melar
+Set-WiaProperty $item.Properties 6147 $dpi
+Set-WiaProperty $item.Properties 6148 $dpi
+# 6149/6150 = X/Y Start position = 0
+Set-WiaProperty $item.Properties 6149 0
+Set-WiaProperty $item.Properties 6150 0
+
+# Hitung extent maksimum dari kapabilitas horizontal/vertikal bed scanner.
+# 6151/6152 = X/Y Extent (lebar/tinggi area scan dalam pixel).
+$maxX = $null; $maxY = $null
+foreach ($p in $item.Properties) {{
+    if ($p.PropertyID -eq 6151) {{ $curX = $p }}
+    if ($p.PropertyID -eq 6152) {{ $curY = $p }}
+}}
+# Horizontal/Vertical bed size (1/1000 inch): 3076 / 3077
+$bedW = $null; $bedH = $null
+foreach ($p in $device.Properties) {{
+    if ($p.PropertyID -eq 3076) {{ $bedW = $p.Value }}
+    if ($p.PropertyID -eq 3077) {{ $bedH = $p.Value }}
+}}
+if ($bedW -and $bedH) {{
+    $extX = [int]([math]::Floor($bedW / 1000.0 * $dpi))
+    $extY = [int]([math]::Floor($bedH / 1000.0 * $dpi))
+}} else {{
+    # Fallback A4: 8.27 x 11.69 inch
+    $extX = [int]([math]::Floor(8.27 * $dpi))
+    $extY = [int]([math]::Floor(11.69 * $dpi))
+}}
+Set-WiaProperty $item.Properties 6151 $extX
+Set-WiaProperty $item.Properties 6152 $extY
+# 6154/6155 = Brightness/Contrast
+Set-WiaProperty $item.Properties 6154 $brightness
+Set-WiaProperty $item.Properties 6155 $contrast
+
 $dialog = New-Object -ComObject WIA.CommonDialog
 $image = $dialog.ShowTransfer($item, $formatId, $false)
 if ($null -eq $image) {{
     throw 'Scan cancelled or failed'
 }}
+if (Test-Path $outputFile) {{ Remove-Item $outputFile -Force }}
 $image.SaveFile($outputFile)
 Write-Output $outputFile
 """
         output = _run_powershell(script)
         if not output:
             raise WIAError("Scanner did not return an output file")
-        return Path(output)
+        return Path(output.splitlines()[-1].strip())
